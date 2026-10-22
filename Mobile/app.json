@@ -1,0 +1,62 @@
+{
+  "expo": {
+    "name": "Fixly",
+    "slug": "fixly",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "splash": {
+      "image": "./assets/fixly-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.lpu.fixly"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/fixly-icon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "package": "com.lpu.fixly"
+    },
+    "plugins": [
+      [
+        "expo-navigation-bar",
+        {
+          "hidden": false,
+          "style": "dark",
+          "enforceContrast": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#F26522"
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/fixly-icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#000000",
+          "dark": {
+            "backgroundColor": "#000000"
+          }
+        }
+      ],
+      "expo-status-bar",
+      "expo-font",
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging"
+    ]
+  }
+}

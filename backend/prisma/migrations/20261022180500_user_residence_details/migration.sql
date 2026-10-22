@@ -1,0 +1,3 @@
+ALTER TABLE "User" ADD COLUMN "residenceType" TEXT;
+ALTER TABLE "User" ADD COLUMN "address" TEXT;
+ALTER TABLE "User" ADD COLUMN "city" TEXT;

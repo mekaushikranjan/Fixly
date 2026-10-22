@@ -1,0 +1,191 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+enum UserRole {
+  user
+  worker
+  department_supervisor
+  super_admin
+}
+
+enum IssueStatus {
+  queued
+  assigned
+  in_progress
+  resolved
+  escalated
+}
+
+enum Priority {
+  Critical
+  High
+  Normal
+  Low
+}
+
+enum WorkerStatus {
+  available
+  busy
+  off_duty
+}
+
+enum ShiftStatus {
+  active
+  scheduled
+  leave
+}
+
+model User {
+  id            String         @id @default(cuid())
+  name          String
+  email         String         @unique
+  passwordHash  String
+  firebaseUid   String?        @unique
+  role          UserRole
+  department    String?
+  avatar        String?
+  phone         String?
+  residenceType String?
+  address       String?
+  city          String?
+  building      String?
+  room          String?
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  issues        Issue[]        @relation("IssueReporter")
+  notifications Notification[]
+  pushDevices   PushDevice[]
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  title     String
+  body      String    @db.Text
+  type      String    @default("info")
+  data      Json?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+}
+
+model PushDevice {
+  id         String   @id @default(cuid())
+  userId     String
+  token      String   @unique
+  platform   String
+  isActive   Boolean  @default(true)
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
+}
+
+model Issue {
+  id                 String      @id @default(cuid())
+  ticketId           String      @unique
+  title              String
+  description        String      @db.Text
+  category           String
+  department         String
+  building           String
+  floor              String
+  room               String
+  status             IssueStatus @default(queued)
+  priority           Priority    @default(Normal)
+  reportedBy         String
+  reportedByUserId   String
+  reportedAt         DateTime    @default(now())
+  resolvedAt         DateTime?
+  slaMinutes         Int
+  slaDeadline        DateTime
+  assignedWorkerId   String?
+  assignedWorkerName String?
+  photoUrl           String?
+  resolutionPhoto    String?
+  coordinates        Json?
+  feedback           Json?
+  reworkCount        Int         @default(0)
+  reporter           User        @relation("IssueReporter", fields: [reportedByUserId], references: [id], onDelete: Restrict)
+  assignedWorker     Worker?     @relation(fields: [assignedWorkerId], references: [id], onDelete: SetNull)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  @@index([department, status])
+  @@index([slaDeadline])
+}
+
+model Worker {
+  id              String        @id @default(cuid())
+  name            String
+  email           String        @unique
+  phone           String
+  department      String
+  status          WorkerStatus  @default(available)
+  rating          Float         @default(0)
+  jobsCompleted   Int           @default(0)
+  reworkRate      Float         @default(0)
+  shift           String
+  currentBuilding String
+  coordinates     Json
+  issues          Issue[]       @relation
+  shifts          ShiftRoster[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([department, status])
+}
+
+model ShiftRoster {
+  id               String      @id @default(cuid())
+  workerId         String
+  workerName       String
+  department       String
+  shift            String
+  date             String
+  status           ShiftStatus @default(scheduled)
+  buildingAssigned String
+  worker           Worker      @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@unique([workerId, date])
+  @@index([department, date])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  adminName  String
+  adminRole  UserRole
+  action     String
+  targetType String
+  targetId   String
+  details    String   @db.Text
+  timestamp  DateTime @default(now())
+  department String?
+
+  @@index([timestamp])
+  @@index([department, timestamp])
+}
+
+model AppSetting {
+  key       String    @id @db.VarChar(100)
+  value     String    @db.Text
+  updatedAt DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("app_settings")
+}
