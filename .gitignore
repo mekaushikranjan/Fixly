@@ -5,6 +5,7 @@ dist/
 **/.gradle/
 **/.kotlin/
 **/build/
+.vscode/
 npm-debug.*
 *.jks
 *.keystore
