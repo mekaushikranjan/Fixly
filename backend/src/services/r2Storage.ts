@@ -1,4 +1,4 @@
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'node:crypto';
 
@@ -71,6 +71,11 @@ function getR2Client(configuration: ReturnType<typeof getR2Configuration>): S3Cl
     });
   }
   return cachedClient;
+}
+
+export async function checkR2Connection(): Promise<void> {
+  const configuration = getR2Configuration();
+  await getR2Client(configuration).send(new HeadBucketCommand({ Bucket: configuration.bucket }));
 }
 
 export async function uploadIssuePhoto(

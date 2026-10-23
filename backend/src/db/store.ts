@@ -126,16 +126,6 @@ class DatabaseStore {
     await prisma.user.update({ where: { id: userId }, data: { firebaseUid } });
   }
 
-  async updatePasswordByEmail(email: string, passwordHash: string): Promise<boolean> {
-    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
-    if (!user) return false;
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { passwordHash },
-    });
-    return true;
-  }
-
   async updateAccountProfile(
     userId: string,
     updates: {

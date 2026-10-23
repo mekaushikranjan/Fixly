@@ -9,7 +9,7 @@ import { createFirebaseCustomToken, FirebaseAdminConfigurationError, verifyFireb
 import { sendWelcomeNotification } from '../services/notificationService';
 
 const roles: UserRole[] = ['user', 'worker', 'department_supervisor', 'super_admin'];
-const passwordResetCodes = new Map<string, { code: string; expiresAt: number }>();
+const passwordResetUnavailableMessage = 'Password reset is unavailable. Contact your campus administrator.';
 
 function validAccountFields(input: Record<string, unknown>): string | undefined {
   if (typeof input.name !== 'string' || input.name.trim().length < 2 || input.name.length > 120) {
@@ -95,89 +95,12 @@ export const authController = {
     }
   },
 
-  forgotPassword: async (req: Request, res: Response): Promise<void> => {
-    const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      res.status(400).json({ error: 'Please provide a valid email address.' });
-      return;
-    }
-
-    try {
-      const user = await db.getUserWithPassword(email);
-      if (!user) {
-        res.status(404).json({ error: 'No Fixly account found with this email address.' });
-        return;
-      }
-
-      if (!user.isActive) {
-        res.status(403).json({ error: 'This account is deactivated. Contact campus administrator.' });
-        return;
-      }
-
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      passwordResetCodes.set(email, {
-        code,
-        expiresAt: Date.now() + 15 * 60 * 1000,
-      });
-
-      console.log(`[AUTH] Password reset code for ${email}: ${code}`);
-
-      res.json({
-        success: true,
-        message: 'Password reset code generated. Use the code to reset your password.',
-        code,
-        email,
-      });
-    } catch (error) {
-      reportDatabaseError(error, res);
-    }
+  forgotPassword: async (_req: Request, res: Response): Promise<void> => {
+    res.status(503).json({ error: passwordResetUnavailableMessage });
   },
 
-  resetPassword: async (req: Request, res: Response): Promise<void> => {
-    const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
-    const code = typeof req.body.code === 'string' ? req.body.code.trim() : '';
-    const newPassword = typeof req.body.newPassword === 'string' ? req.body.newPassword : '';
-
-    if (!email || !code || !newPassword) {
-      res.status(400).json({ error: 'Email, verification code, and new password are required.' });
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      res.status(400).json({ error: 'Password must be at least 6 characters long.' });
-      return;
-    }
-
-    const record = passwordResetCodes.get(email);
-    if (!record || record.code !== code) {
-      res.status(400).json({ error: 'Invalid or expired verification code.' });
-      return;
-    }
-
-    if (Date.now() > record.expiresAt) {
-      passwordResetCodes.delete(email);
-      res.status(400).json({ error: 'Verification code has expired. Please request a new one.' });
-      return;
-    }
-
-    try {
-      const passwordHash = await bcrypt.hash(newPassword, 12);
-      const updated = await db.updatePasswordByEmail(email, passwordHash);
-      if (!updated) {
-        res.status(404).json({ error: 'Account not found.' });
-        return;
-      }
-
-      passwordResetCodes.delete(email);
-      console.log(`[AUTH] Password reset successfully for ${email}`);
-
-      res.json({
-        success: true,
-        message: 'Password has been reset successfully. You can now log in with your new password.',
-      });
-    } catch (error) {
-      reportDatabaseError(error, res);
-    }
+  resetPassword: async (_req: Request, res: Response): Promise<void> => {
+    res.status(503).json({ error: passwordResetUnavailableMessage });
   },
 
   googleLogin: async (req: Request, res: Response): Promise<void> => {

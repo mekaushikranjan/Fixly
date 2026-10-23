@@ -68,6 +68,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const isSuper = currentUser.role === 'super_admin';
   const visibleNavItems = isSuper ? navItems : navItems.filter((item) => item.id !== 'users');
+  const roleLabel = currentUser.role
+    .split('_')
+    .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
+    .join(' ');
 
   return (
     <>
@@ -115,10 +119,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         <div className="sidebar-role">
-          <div className="sidebar-section-label">Signed in as</div>
+          <div className="sidebar-section-label">Account role</div>
           <div className="sidebar-active-role">
             <ShieldCheck size={14} />
-            <span>{currentUser.role.replaceAll('_', ' ')}</span>
+            <span>{roleLabel}</span>
           </div>
           {!isSuper && <div className="sidebar-scope-note">Scoped: {currentUser.department || 'No department assigned'}</div>}
         </div>

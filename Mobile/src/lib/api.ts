@@ -328,14 +328,6 @@ export const mobileApi = {
     return request('/auth/google', { method: 'POST', body: JSON.stringify({ firebaseIdToken }) });
   },
 
-  forgotPassword(email: string): Promise<{ success: boolean; message: string; code?: string; email: string }> {
-    return request('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) });
-  },
-
-  resetPassword(email: string, code: string, newPassword: string): Promise<{ success: boolean; message: string }> {
-    return request('/auth/reset-password', { method: 'POST', body: JSON.stringify({ email, code, newPassword }) });
-  },
-
   getMe(token: string): Promise<{ user: MobileAccount }> {
     return request('/auth/me', {}, token);
   },

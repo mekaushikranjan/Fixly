@@ -145,6 +145,10 @@ export function verifyFirebaseIdToken(idToken: string): Promise<DecodedIdToken> 
   return getAuth(getTokenVerifierApp()).verifyIdToken(idToken);
 }
 
+export async function checkFirebaseConnection(): Promise<void> {
+  await getAuth(getAdminApp()).listUsers(1);
+}
+
 export function createFirebaseCustomToken(uid: string, role: string): Promise<string> {
   return getAuth(getAdminApp()).createCustomToken(uid, { fixlyUserId: uid, fixlyRole: role });
 }
