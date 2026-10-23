@@ -136,6 +136,7 @@ export interface AuthContextType {
   login: (session: import('../lib/api').MobileSession) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (updatedFields: Partial<UserProfile>) => Promise<void>;
+  updateProfilePhoto: (photoBase64: string, photoMimeType: string) => Promise<void>;
   profile: UserProfile;
 }
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
+  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -29,7 +30,7 @@ type ResidenceType = 'hostel' | 'day_scholar';
 export default function ProfileDetailsScreen({ navigation }: ProfileDetailsScreenProps) {
   useSystemBars(colors.primary, 'light');
   const insets = useSafeAreaInsets();
-  const { profile, updateProfile } = useAuth();
+  const { profile, updateProfile, updateProfilePhoto } = useAuth();
 
   const [phone, setPhone] = useState(profile.phone || '');
   const [room, setRoom] = useState(profile.room || '');
@@ -41,6 +42,7 @@ export default function ProfileDetailsScreen({ navigation }: ProfileDetailsScree
   const [city, setCity] = useState(profile.city || '');
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingPhoto, setIsSavingPhoto] = useState(false);
   const [tempPhone, setTempPhone] = useState(phone);
   const [tempRoom, setTempRoom] = useState(room);
   const [tempBlock, setTempBlock] = useState(block);
@@ -100,6 +102,36 @@ export default function ProfileDetailsScreen({ navigation }: ProfileDetailsScree
     }
   };
 
+  const handleChangePhoto = async () => {
+    if (isSavingPhoto) return;
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Photo access needed', 'Allow photo library access to choose a profile photo.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        base64: true,
+        quality: 0.8,
+      });
+      if (result.canceled) return;
+      const photo = result.assets[0];
+      if (!photo.base64 || !photo.mimeType) {
+        Alert.alert('Photo unavailable', 'Could not read this photo. Choose another image and try again.');
+        return;
+      }
+      setIsSavingPhoto(true);
+      await updateProfilePhoto(photo.base64, photo.mimeType);
+    } catch (error) {
+      Alert.alert('Photo not updated', error instanceof Error ? error.message : 'Please try again.');
+    } finally {
+      setIsSavingPhoto(false);
+    }
+  };
+
   return (
     <View style={styles.screen}>
       <ScreenHeader
@@ -151,13 +183,24 @@ export default function ProfileDetailsScreen({ navigation }: ProfileDetailsScree
           </View>
 
           <View style={styles.passIdentity}>
-            <View style={styles.avatarFrame}>
+            <Pressable
+              style={styles.avatarFrame}
+              onPress={() => void handleChangePhoto()}
+              disabled={isSavingPhoto}
+              accessibilityRole="button"
+              accessibilityLabel="Change profile photo"
+            >
               {profile.avatar ? (
                 <Image source={{ uri: profile.avatar }} style={styles.avatarImage} />
               ) : (
                 <Text style={styles.avatarFallback}>{profile.initials || 'U'}</Text>
               )}
-            </View>
+              <View style={styles.avatarEditBadge}>
+                {isSavingPhoto
+                  ? <ActivityIndicator size="small" color="#FFFFFF" />
+                  : <Ionicons name="camera" size={13} color="#FFFFFF" />}
+              </View>
+            </Pressable>
             <View style={styles.identityCopy}>
               <Text style={styles.userName} numberOfLines={1}>{profile.name || 'Campus Member'}</Text>
               <Text style={styles.userEmail} numberOfLines={1}>{profile.email || 'Email not provided'}</Text>
@@ -574,6 +617,19 @@ const styles = StyleSheet.create({
   },
   avatarImage: { width: '100%', height: '100%' },
   avatarFallback: { color: '#FFFFFF', fontSize: 22, fontWeight: '900' },
+  avatarEditBadge: {
+    position: 'absolute',
+    right: 2,
+    bottom: 2,
+    width: 23,
+    height: 23,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primaryDark,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+  },
   identityCopy: { flex: 1, minWidth: 0 },
   userName: { color: '#FFFFFF', fontSize: 18, fontWeight: '800' },
   userEmail: { color: 'rgba(255,255,255,0.82)', fontSize: 11, marginTop: 5 },

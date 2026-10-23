@@ -69,23 +69,14 @@ function asAudit(log: Prisma.AuditLogGetPayload<object>): AuditLog {
 }
 
 class IssueNoLongerAvailableError extends Error {}
-
 class DatabaseStore {
-  async bootstrapAdmin(name: string, email: string, password: string): Promise<void> {
-    const count = await prisma.user.count();
-    if (count > 0) return;
-    if (!name.trim() || !email.trim() || password.length < 12) {
-      throw new Error('Set BOOTSTRAP_ADMIN_NAME, BOOTSTRAP_ADMIN_EMAIL and a BOOTSTRAP_ADMIN_PASSWORD with at least 12 characters.');
-    }
-    await prisma.user.create({
-      data: {
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        role: 'super_admin',
-        passwordHash: await bcrypt.hash(password, 12),
-      },
+  async ensureActiveSuperAdmin(): Promise<void> {
+    const count = await prisma.user.count({
+      where: { role: 'super_admin', isActive: true },
     });
-    console.info(`Created initial Super Admin account: ${email.trim().toLowerCase()}`);
+    if (count === 0) {
+      throw new Error('No active Super Admin account exists in the database. Create or reactivate a Super Admin before starting the API.');
+    }
   }
 
   async getUserByEmail(email: string): Promise<UserAccount | undefined> {

@@ -15,6 +15,7 @@ interface TopbarProps {
   notificationCount: number;
   onOpenNotifications: () => void;
   onOpenSettings?: () => void;
+  appName?: string;
   appVersion?: string;
 }
 
@@ -30,6 +31,7 @@ export const Topbar: React.FC<TopbarProps> = ({
   notificationCount,
   onOpenNotifications,
   onOpenSettings,
+  appName,
   appVersion,
 }) => (
   <div className="topbar">
@@ -62,8 +64,8 @@ export const Topbar: React.FC<TopbarProps> = ({
       {onOpenSettings && (
         <button
           className="icon-button"
-          aria-label="Mobile App Version & Settings"
-          title={`Mobile App Version ${appVersion ? `(v${appVersion})` : ''}`}
+          aria-label="Mobile App Settings"
+          title={`${appName || 'Mobile App'} Settings ${appVersion ? `(v${appVersion})` : ''}`}
           onClick={onOpenSettings}
         >
           <Settings size={16} />

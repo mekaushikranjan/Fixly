@@ -1,22 +1,21 @@
 import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { colors, spacing } from '../theme/colors';
-import appConfig from '../../app.json';
 
 interface ProfileBrandFooterProps {
   accountLabel?: string;
   accountName?: string;
   email?: string;
+  appName?: string;
   university?: string;
   version?: string;
 }
 
 export default function ProfileBrandFooter({
-  university = 'Lovely Professional University',
+  appName,
+  university,
   version,
 }: ProfileBrandFooterProps) {
-  const displayVersion = version?.trim() || appConfig.expo.version;
-
   return (
     <View style={styles.container}>
       <View style={styles.brandRow}>
@@ -25,18 +24,15 @@ export default function ProfileBrandFooter({
           style={styles.icon}
           resizeMode="contain"
         />
-        <Image
-          source={require('../../assets/fixly-wordmark.png')}
-          style={styles.wordmark}
-          resizeMode="contain"
-          accessibilityLabel="Fixly"
-        />
-        <View style={styles.versionPill}>
-          <Text style={styles.versionText}>v{displayVersion}</Text>
-        </View>
+        {appName && <Text style={styles.brandName}>{appName}</Text>}
+        {version && (
+          <View style={styles.versionPill}>
+            <Text style={styles.versionText}>v{version}</Text>
+          </View>
+        )}
       </View>
 
-      <Text style={styles.universityText}>{university}</Text>
+      {university && <Text style={styles.universityText}>{university}</Text>}
       <Text style={styles.campusTagline}>Smart Campus Facilities & Maintenance</Text>
     </View>
   );
@@ -61,9 +57,10 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 7,
   },
-  wordmark: {
-    width: 105,
-    height: 32,
+  brandName: {
+    color: colors.primaryDark,
+    fontSize: 17,
+    fontWeight: '800',
   },
   versionPill: {
     paddingHorizontal: 8,

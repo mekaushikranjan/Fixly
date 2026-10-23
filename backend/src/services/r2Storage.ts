@@ -17,6 +17,8 @@ export interface UploadedIssuePhoto {
   remove: () => Promise<void>;
 }
 
+export type UploadedProfilePhoto = UploadedIssuePhoto;
+
 function getR2Configuration() {
   const endpoint = process.env.R2_ENDPOINT?.trim();
   const bucket = process.env.R2_BUCKET_NAME?.trim();
@@ -83,9 +85,25 @@ export async function uploadIssuePhoto(
   base64: string,
   contentType: string,
 ): Promise<UploadedIssuePhoto> {
+  return uploadPhoto(`issue-photos/${userId}`, base64, contentType);
+}
+
+export async function uploadUserAvatar(
+  userId: string,
+  base64: string,
+  contentType: string,
+): Promise<UploadedProfilePhoto> {
+  return uploadPhoto(`profile-photos/${userId}`, base64, contentType);
+}
+
+async function uploadPhoto(
+  prefix: string,
+  base64: string,
+  contentType: string,
+): Promise<UploadedIssuePhoto> {
   const configuration = getR2Configuration();
   const client = getR2Client(configuration);
-  const key = `issue-photos/${userId}/${randomUUID()}`;
+  const key = `${prefix}/${randomUUID()}`;
 
   await client.send(new PutObjectCommand({
     Bucket: configuration.bucket,

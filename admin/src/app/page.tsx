@@ -108,8 +108,9 @@ export default function AdminDashboardPage() {
   const [notificationCount, setNotificationCount] = useState(0);
   const [analytics, setAnalytics] = useState<{ summary: AnalyticsSummary; departments: DepartmentMetrics[]; trends: ResolutionTrend[] } | null>(null);
   const [appSettingsOpen, setAppSettingsOpen] = useState(false);
-  const [appVersion, setAppVersion] = useState('1.0.0');
-  const [universityName, setUniversityName] = useState('Lovely Professional University');
+  const [appName, setAppName] = useState('');
+  const [appVersion, setAppVersion] = useState('');
+  const [universityName, setUniversityName] = useState('');
 
   const [loading, setLoading] = useState(true);
   const [backendOnline, setBackendOnline] = useState(false);
@@ -136,7 +137,7 @@ export default function AdminDashboardPage() {
     try {
       const online = await api.checkHealth();
       setBackendOnline(online);
-      const [issuesResponse, escalationResponse, workerResponse, shiftsResponse, auditResponse, analyticsResponse, usersResponse, notificationsResponse] = await Promise.all([
+      const [issuesResponse, escalationResponse, workerResponse, shiftsResponse, auditResponse, analyticsResponse, usersResponse, notificationsResponse, appConfig] = await Promise.all([
         api.getIssues(),
         api.getEscalations(),
         api.getWorkers(),
@@ -145,6 +146,7 @@ export default function AdminDashboardPage() {
         api.getAnalytics(),
         currentRole === 'super_admin' ? api.getUsers() : Promise.resolve({ users: [] }),
         api.getNotifications(),
+        api.getAppConfig(),
       ]);
       setIssues(issuesResponse.issues);
       setEscalations(escalationResponse.escalations);
@@ -155,12 +157,9 @@ export default function AdminDashboardPage() {
       setUsers(usersResponse.users);
       setNotifications(notificationsResponse.notifications);
       setNotificationCount(notificationsResponse.unreadCount);
-
-      // Load live mobile app version & university setting
-      api.getAppConfig().then((cfg) => {
-        if (cfg.version) setAppVersion(cfg.version);
-        if (cfg.university) setUniversityName(cfg.university);
-      }).catch(() => {});
+      setAppName(appConfig.appName);
+      setAppVersion(appConfig.version);
+      setUniversityName(appConfig.university);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to load dashboard data.';
       console.error('Failed to load dashboard data:', error);
@@ -420,6 +419,7 @@ export default function AdminDashboardPage() {
           notificationCount={notificationCount}
           onOpenNotifications={() => setActiveTab('notifications')}
           onOpenSettings={() => setAppSettingsOpen(true)}
+          appName={appName}
           appVersion={appVersion}
           searchValue={searchQuery}
           onSearchChange={setSearchQuery}
@@ -440,7 +440,7 @@ export default function AdminDashboardPage() {
                 title="Edit mobile app version & university setting"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}
               >
-                <span>Mobile App: <strong>v{appVersion}</strong></span>
+                <span>Mobile App: <strong>{appName || 'Loading…'}{appVersion ? ` v${appVersion}` : ''}</strong></span>
               </button>
               <span className={`connection-pill ${backendOnline ? 'online' : 'offline'}`}>
                 <span className="connection-dot" />
@@ -678,13 +678,15 @@ export default function AdminDashboardPage() {
       )}
       {appSettingsOpen && (
         <AppSettingsModal
+          initialAppName={appName}
           initialVersion={appVersion}
           initialUniversity={universityName}
           onClose={() => setAppSettingsOpen(false)}
-          onUpdated={(newVer, newUniv) => {
+          onUpdated={(newName, newVer, newUniv) => {
+            setAppName(newName);
             setAppVersion(newVer);
             setUniversityName(newUniv);
-            notify(`App version updated to v${newVer}`, 'success');
+            notify(`${newName} settings updated`, 'success');
           }}
         />
       )}

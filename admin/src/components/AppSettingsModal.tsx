@@ -1,24 +1,27 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Smartphone, Check, X, Building, Tag } from 'lucide-react';
+import { Smartphone, Check, X, Building, Tag, Type } from 'lucide-react';
 import { api } from '../lib/api';
 
 interface AppSettingsModalProps {
+  initialAppName: string;
   initialVersion: string;
   initialUniversity: string;
   onClose: () => void;
-  onUpdated: (version: string, university: string) => void;
+  onUpdated: (appName: string, version: string, university: string) => void;
 }
 
 export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
+  initialAppName,
   initialVersion,
   initialUniversity,
   onClose,
   onUpdated,
 }) => {
-  const [version, setVersion] = useState(initialVersion || '1.0.0');
-  const [university, setUniversity] = useState(initialUniversity || 'Lovely Professional University');
+  const [appName, setAppName] = useState(initialAppName);
+  const [version, setVersion] = useState(initialVersion);
+  const [university, setUniversity] = useState(initialUniversity);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -29,15 +32,20 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
       setError('App version cannot be blank.');
       return;
     }
+    if (!appName.trim()) {
+      setError('App name cannot be blank.');
+      return;
+    }
 
     setSaving(true);
     setError('');
     try {
       const res = await api.updateAppConfig({
+        appName: appName.trim(),
         version: version.trim(),
         university: university.trim(),
       });
-      onUpdated(res.version, res.university);
+      onUpdated(res.appName, res.version, res.university);
       setSuccess(true);
       setTimeout(() => {
         onClose();
@@ -66,7 +74,7 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
           </div>
           <div className="modal-heading-copy">
             <h2 id="app-settings-title">Mobile App Configuration</h2>
-            <p>Set the live mobile app version and campus university details displayed on Fixly.</p>
+            <p>Update the app name, version, and campus details shown in the mobile app.</p>
           </div>
           <button type="button" className="modal-close" onClick={onClose} aria-label="Close">
             <X size={19} />
@@ -87,6 +95,23 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
 
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <span className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Type size={14} color="#F26522" /> App Name
+            </span>
+            <input
+              className="input"
+              value={appName}
+              onChange={(e) => setAppName(e.target.value)}
+              placeholder="e.g. Fixly"
+              maxLength={80}
+              required
+            />
+            <span style={{ fontSize: 11, color: '#6B7280' }}>
+              Displayed with the app branding on mobile devices.
+            </span>
+          </label>
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Tag size={14} color="#F26522" /> Mobile App Version
             </span>
             <input
@@ -94,6 +119,7 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
               value={version}
               onChange={(e) => setVersion(e.target.value)}
               placeholder="e.g. 1.0.0 or 1.1.2"
+              maxLength={32}
               required
             />
             <span style={{ fontSize: 11, color: '#6B7280' }}>
@@ -110,6 +136,7 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
               value={university}
               onChange={(e) => setUniversity(e.target.value)}
               placeholder="e.g. Lovely Professional University"
+              maxLength={160}
               required
             />
             <span style={{ fontSize: 11, color: '#6B7280' }}>
@@ -123,13 +150,13 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
               Mobile Footer Live Preview
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 4 }}>
-              <span style={{ fontWeight: 800, color: '#F26522', fontSize: 15 }}>Fixly</span>
+              <span style={{ fontWeight: 800, color: '#F26522', fontSize: 15 }}>{appName || 'App name'}</span>
               <span style={{ padding: '2px 7px', borderRadius: 999, backgroundColor: '#FDE9DC', color: '#B94E0F', fontSize: 10, fontWeight: 800 }}>
-                v{version || '1.0.0'}
+                {version ? `v${version}` : 'Version'}
               </span>
             </div>
             <div style={{ fontWeight: 700, fontSize: 12, color: '#2C2C2A' }}>
-              {university }
+              {university}
             </div>
           </div>
         </div>
@@ -139,7 +166,7 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
             Cancel
           </button>
           <button type="submit" className="button button-primary" disabled={saving}>
-            {saving ? 'Saving...' : 'Save App Version'}
+            {saving ? 'Saving...' : 'Save App Settings'}
           </button>
         </div>
       </form>

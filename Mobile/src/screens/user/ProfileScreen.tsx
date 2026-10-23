@@ -36,19 +36,20 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   const { profile, logout } = useAuth();
   const { issues, error, refresh } = useIssues();
   const { count: unreadCount, refresh: refreshUnread } = useUnreadNotificationCount();
-  const [appConfig, setAppConfig] = useState<{ version?: string; university?: string }>({});
+  const [appConfig, setAppConfig] = useState<{ appName?: string; version?: string; university?: string }>({});
 
   const loadConfig = useCallback(async () => {
     try {
       const config = await mobileApi.getAppConfig();
       if (config) {
         setAppConfig({
+          appName: config.appName,
           version: config.version,
           university: config.university,
         });
       }
     } catch {
-      // Fallback to local default if offline
+      // Keep the DB-backed identity hidden until configuration is available.
     }
   }, []);
   useApiCacheRefresh('/app/config', undefined, loadConfig);
@@ -417,6 +418,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
 
         {/* Brand Footer with live Admin-configured version and university */}
         <ProfileBrandFooter
+          appName={appConfig.appName}
           version={appConfig.version}
           university={appConfig.university || 'Lovely Professional University'}
         />

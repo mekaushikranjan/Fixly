@@ -159,8 +159,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       city: fields.city,
       building: fields.block,
       room: fields.room,
-      avatar: fields.avatar,
     });
+    setSession({ ...session, user });
+  };
+
+  const updateProfilePhoto = async (photoBase64: string, photoMimeType: string): Promise<void> => {
+    if (!session) throw new Error('Sign in to update your profile photo.');
+    const { user } = await mobileApi.updateMe(session.token, { photoBase64, photoMimeType });
     setSession({ ...session, user });
   };
 
@@ -173,6 +178,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     login,
     logout,
     updateProfile,
+    updateProfilePhoto,
     profile,
   }), [role, session, isLoading, token, profile]);
 

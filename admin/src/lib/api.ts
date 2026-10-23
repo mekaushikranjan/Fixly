@@ -297,11 +297,11 @@ export class AdminApiClient {
     });
   }
 
-  getAppConfig(): Promise<{ version: string; university: string; updatedAt?: string }> {
+  getAppConfig(): Promise<{ appName: string; version: string; university: string; updatedAt?: string }> {
     return this.request('/app/config');
   }
 
-  updateAppConfig(data: { version: string; university?: string }): Promise<{ success: boolean; version: string; university: string; updatedAt?: string }> {
+  updateAppConfig(data: { appName: string; version: string; university?: string }): Promise<{ success: boolean; appName: string; version: string; university: string; updatedAt?: string }> {
     return this.request('/app/config', {
       method: 'PATCH',
       body: JSON.stringify(data),

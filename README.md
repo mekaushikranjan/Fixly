@@ -212,7 +212,7 @@ cd backend
 cp .env.example .env
 ```
 
-Set a unique `POSTGRES_PASSWORD`, a `JWT_SECRET` of at least 32 characters, and a unique `BOOTSTRAP_ADMIN_PASSWORD` of at least 12 characters. Keep `.env` private. For local development, `DATABASE_URL` and `DIRECT_DATABASE_URL` should point to the Docker PostgreSQL service.
+Set a unique `POSTGRES_PASSWORD` and a `JWT_SECRET` of at least 32 characters. Keep `.env` private. For local development, `DATABASE_URL` and `DIRECT_DATABASE_URL` should point to the Docker PostgreSQL service.
 
 Start PostgreSQL and deploy the checked-in migrations:
 
@@ -223,7 +223,7 @@ npm run db:deploy
 npm run db:generate
 ```
 
-When the database is empty, backend startup creates the Super Admin account configured by `BOOTSTRAP_ADMIN_NAME`, `BOOTSTRAP_ADMIN_EMAIL`, and `BOOTSTRAP_ADMIN_PASSWORD`. It does not insert sample records by default.
+Backend startup verifies that the database contains an active Super Admin account. Create or reactivate that account through your trusted database provisioning process before starting the API. The application does not create accounts or assign admin IDs automatically. Startup does not insert sample records by default.
 
 To add optional demo accounts and sample issues to the configured database:
 
@@ -260,7 +260,7 @@ npm install
 npm run dev
 ```
 
-Set `NEXT_PUBLIC_API_URL` in `admin/.env.local` to the reachable API URL, then open `http://localhost:3000` and sign in with the configured bootstrap account.
+Set `NEXT_PUBLIC_API_URL` in `admin/.env.local` to the reachable API URL, then open `http://localhost:3000` and sign in with an active Super Admin account provisioned in the database.
 
 ### 4. Start the mobile application (optional)
 
@@ -277,7 +277,7 @@ For Android and iOS native builds, provide Firebase app configuration as `Mobile
 
 Google sign-in, native FCM, and native image-picker capabilities require an installed development or production build. Expo Go is not supported for these native integrations. Android and iOS push delivery also requires Firebase and APNs setup. Web push requires a VAPID key and browser service-worker support; it is separate from native FCM registration.
 
-Issue-photo uploads are handled by the backend, not by direct Firebase Storage uploads. Configure the backend's `R2_ENDPOINT`, `R2_BUCKET_NAME`, `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY`; optionally set `R2_PUBLIC_BASE_URL` to serve public photo URLs. Without R2 configuration, issue creation without a photo still works, while a photo upload returns a configuration error.
+Issue and profile-photo uploads are handled by the backend, not by direct Firebase Storage uploads. Configure the backend's `R2_ENDPOINT`, `R2_BUCKET_NAME`, `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY`; optionally set `R2_PUBLIC_BASE_URL` to serve public photo URLs. Google profile photos are copied to R2 during Google sign-in and their R2 URL is stored in the user record. Without R2 configuration, issue creation without a photo still works, while photo uploads return a configuration error.
 
 Use `a` or `i` in the Expo terminal for a native run, or `w` for the web preview.
 
@@ -287,7 +287,7 @@ Copy the sample environment file for the application you are configuring, then p
 
 | File | Important configuration |
 | --- | --- |
-| `backend/.env` | Database connection, JWT signing secret, bootstrap admin values, Firebase Admin credentials, and R2 storage configuration |
+| `backend/.env` | Database connection, JWT signing secret, Firebase Admin credentials, and R2 storage configuration |
 | `admin/.env.local` | `NEXT_PUBLIC_API_URL` |
 | `Mobile/.env` | `EXPO_PUBLIC_API_URL`, Firebase client settings, Google client IDs, and optional web-push VAPID key |
 
@@ -345,4 +345,6 @@ The complete route definitions and per-route role requirements are in `backend/s
 - Use `npm run db:generate` after Prisma schema changes.
 - In production, apply reviewed migrations with `npm run db:deploy` before starting the new backend version. Do not use `migrate dev` or `migrate reset` against production.
 - For a hosted PostgreSQL service such as Neon, configure `DATABASE_URL` for the runtime and `DIRECT_DATABASE_URL` for direct migration connections.
+- The app name and version are managed through the admin settings and stored in the database; they are not backend environment variables.
+- Build the admin Docker image with `--build-arg NEXT_PUBLIC_API_URL=https://<your-api-host>/api` so the client bundle targets the deployed backend.
 - Keep database, JWT, Firebase Admin, storage, and signing credentials in private server/build environment configuration—not source code or client bundles.

@@ -7,6 +7,7 @@ import { prisma } from './db/prisma';
 import { db } from './db/store';
 import { checkFirebaseConnection } from './services/firebaseAdmin';
 import { checkR2Connection } from './services/r2Storage';
+import { getAppConfig } from './services/appSettings';
 import { renderPreviewPage } from './views/previewHtml';
 
 dotenv.config({ path: resolve(__dirname, '../.env') });
@@ -47,15 +48,10 @@ if (jwtSecret.length < 32) {
 }
 requiredEnvironmentValue('DATABASE_URL');
 requiredEnvironmentValue('DIRECT_DATABASE_URL');
-const bootstrapAdminName = requiredEnvironmentValue('BOOTSTRAP_ADMIN_NAME');
-const bootstrapAdminEmail = requiredEnvironmentValue('BOOTSTRAP_ADMIN_EMAIL');
-const bootstrapAdminPassword = requiredEnvironmentValue('BOOTSTRAP_ADMIN_PASSWORD');
-const appName = process.env.APP_NAME?.trim() || 'Fixly Campus';
-const appVersion = process.env.APP_VERSION?.trim() || '1.0.0';
+const nodeEnvironment = requiredEnvironmentValue('NODE_ENV');
 
-function publicUrl(name: string, value: string | undefined, fallback: string): string {
-  const configured = value?.trim();
-  if (!configured) return fallback;
+function publicUrl(name: string, value: string): string {
+  const configured = value.trim();
   let parsed: URL;
   try {
     parsed = new URL(configured);
@@ -93,6 +89,13 @@ app.use('/api/issues', (req, res, next) => {
   }
   next();
 });
+app.use('/api/auth/me', (req, res, next) => {
+  if (req.method === 'PATCH') {
+    express.json({ limit: '8mb' })(req, res, next);
+    return;
+  }
+  next();
+});
 app.use(express.json({ limit: '2mb' }));
 app.use((req, _res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
@@ -104,10 +107,11 @@ app.use('/assets', express.static(resolve(__dirname, '../public')));
 app.get('/health', async (_req, res) => {
   try {
     await prisma.user.count({ where: { id: '__health_check__' } });
+    const { appName } = await getAppConfig();
     res.json({ status: 'online', service: appName, database: 'connected', timestamp: new Date().toISOString() });
   } catch (error) {
     console.error('Health check failed:', error);
-    res.status(503).json({ status: 'offline', service: appName, database: 'disconnected' });
+    res.status(503).json({ status: 'offline', database: 'disconnected' });
   }
 });
 
@@ -124,56 +128,62 @@ app.get('/health/integrations', async (_req, res) => {
   const mobileApiProbe = process.env.MOBILE_APP_API_URL?.trim()
     ? check('Mobile app API', checkMobileAppApi)
     : Promise.resolve('not_configured' as const);
-  const [database, firebase, cloudflareR2, mobileApi] = await Promise.all([
+  const [database, firebase, cloudflareR2, mobileApi, config] = await Promise.all([
     check('PostgreSQL', () => prisma.user.count({ where: { id: '__health_check__' } })),
     check('Firebase Admin', checkFirebaseConnection),
     check('Cloudflare R2', checkR2Connection),
     mobileApiProbe,
+    getAppConfig().catch((error: unknown) => {
+      console.error('App settings health check failed:', error);
+      return undefined;
+    }),
   ]);
-  const status = database === 'connected' ? 'online' : 'offline';
-  res.status(database === 'connected' ? 200 : 503).json({
+  const status = database === 'connected' && config ? 'online' : 'offline';
+  res.status(status === 'online' ? 200 : 503).json({
     status,
-    service: appName,
+    ...(config && { service: config.appName }),
     database,
     integrations: { firebase, cloudflareR2, mobileApi },
     timestamp: new Date().toISOString(),
   });
 });
 
-const defaultAdminUrl = publicUrl(
-  'ADMIN_URL',
-  process.env.ADMIN_URL || process.env.ADMIN_WEB_URL,
-  allowedOrigins[0] || 'http://localhost:3000',
-);
+const adminUrl = publicUrl('ADMIN_URL', requiredEnvironmentValue('ADMIN_URL'));
 
 app.get(['/'], (req, res) => {
   const acceptsJson = req.headers.accept?.includes('application/json') && !req.headers.accept?.includes('text/html');
-  if (acceptsJson) {
-    return res.json({
-      name: appName,
-      version: appVersion,
-      status: 'online',
-      environment: process.env.NODE_ENV,
-      adminPortal: defaultAdminUrl,
-      health: '/health',
-      endpoints: {
-        auth: '/api/auth',
-        issues: '/api/issues',
-        workers: '/api/workers',
-        notifications: '/api/notifications',
-        departments: '/api/departments'
-      }
-    });
-  }
+  void getAppConfig().then((config) => {
+    if (acceptsJson) {
+      res.json({
+        name: config.appName,
+        version: config.version,
+        status: 'online',
+        environment: nodeEnvironment,
+        adminPortal: adminUrl,
+        health: '/health',
+        endpoints: {
+          auth: '/api/auth',
+          issues: '/api/issues',
+          workers: '/api/workers',
+          notifications: '/api/notifications',
+          departments: '/api/departments'
+        }
+      });
+      return;
+    }
 
-  const html = renderPreviewPage({
-    appName,
-    adminUrl: defaultAdminUrl,
-    environment: (process.env.NODE_ENV || 'development').toUpperCase(),
-    version: appVersion,
+    const html = renderPreviewPage({
+      adminUrl,
+      appName: config.appName,
+      appVersion: config.version,
+      environment: nodeEnvironment.toUpperCase(),
+    });
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  }).catch((error: unknown) => {
+    console.error('Failed to load app settings:', error);
+    res.status(503).json({ error: 'App settings are unavailable' });
   });
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  return res.send(html);
 });
 
 app.use('/api', apiRouter);
@@ -181,13 +191,10 @@ app.use((_req, res) => res.status(404).json({ error: 'Endpoint not found' }));
 
 async function startServer(): Promise<void> {
   await prisma.$connect();
-  await db.bootstrapAdmin(
-    bootstrapAdminName,
-    bootstrapAdminEmail,
-    bootstrapAdminPassword,
-  );
+  const { appName } = await getAppConfig();
+  await db.ensureActiveSuperAdmin();
   app.listen(PORT, () => {
-    console.log(`Fixly Campus API listening on port ${PORT}`);
+    console.log(`${appName} API listening on port ${PORT}`);
   });
 }
 

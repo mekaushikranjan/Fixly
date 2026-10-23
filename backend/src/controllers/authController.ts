@@ -7,6 +7,8 @@ import { AuthenticatedRequest, generateToken } from '../middleware/auth';
 import { ResidenceType, UserAccount, UserRole } from '../models/types';
 import { createFirebaseCustomToken, FirebaseAdminConfigurationError, verifyFirebaseIdToken } from '../services/firebaseAdmin';
 import { sendWelcomeNotification } from '../services/notificationService';
+import { decodeProfilePhoto, needsGoogleProfilePhotoMigration, uploadGoogleProfilePhoto } from '../services/profilePhotos';
+import { UploadedProfilePhoto, uploadUserAvatar } from '../services/r2Storage';
 
 const roles: UserRole[] = ['user', 'worker', 'department_supervisor', 'super_admin'];
 const passwordResetUnavailableMessage = 'Password reset is unavailable. Contact your campus administrator.';
@@ -59,6 +61,15 @@ function reportDatabaseError(error: unknown, res: Response): void {
   }
   console.error('User account database operation failed:', error);
   res.status(500).json({ error: 'Unable to complete the account operation' });
+}
+
+async function removeProfilePhoto(upload: UploadedProfilePhoto | undefined, context: string): Promise<void> {
+  if (!upload) return;
+  try {
+    await upload.remove();
+  } catch (error) {
+    console.error(`${context}:`, error);
+  }
 }
 
 export const authController = {
@@ -117,25 +128,46 @@ export const authController = {
       }
       let account = await db.getFirebaseUser(decoded.email);
       let createdAccount = false;
+      const googlePhotoUrl = typeof decoded.picture === 'string' ? decoded.picture : '';
+      let photoUpload: UploadedProfilePhoto | undefined;
       if (!account) {
         const name = typeof decoded.name === 'string' && decoded.name.trim()
           ? decoded.name.trim().slice(0, 120)
           : decoded.email.split('@')[0].slice(0, 120);
-        const avatar = typeof decoded.picture === 'string' && decoded.picture.length <= 500
-          ? decoded.picture
-          : undefined;
+        if (googlePhotoUrl) {
+          try {
+            photoUpload = await uploadGoogleProfilePhoto(decoded.uid, googlePhotoUrl);
+          } catch (error) {
+            console.error('Unable to copy the Google profile photo to Cloudflare R2:', error);
+          }
+        }
         try {
           account = {
-            ...await db.createGoogleUser(name, decoded.email, decoded.uid, avatar),
+            ...await db.createGoogleUser(name, decoded.email, decoded.uid, photoUpload?.downloadUrl),
             firebaseUid: decoded.uid,
           };
           createdAccount = true;
         } catch (createError) {
+          await removeProfilePhoto(photoUpload, 'Unable to remove an unused Google profile photo');
+          photoUpload = undefined;
           if (!(createError instanceof Prisma.PrismaClientKnownRequestError) || createError.code !== 'P2002') {
             throw createError;
           }
           account = await db.getFirebaseUser(decoded.email);
           if (!account) throw createError;
+        }
+      }
+      if (!createdAccount && account && needsGoogleProfilePhotoMigration(account.avatar) && googlePhotoUrl) {
+        try {
+          photoUpload = await uploadGoogleProfilePhoto(account.id, googlePhotoUrl);
+          account = {
+            ...await db.updateAccountProfile(account.id, { avatar: photoUpload.downloadUrl }),
+            firebaseUid: account.firebaseUid,
+          };
+        } catch (error) {
+          await removeProfilePhoto(photoUpload, 'Unable to remove an unlinked Google profile photo');
+          photoUpload = undefined;
+          console.error('Unable to save the Google profile photo to Cloudflare R2:', error);
         }
       }
       if (createdAccount) await sendWelcomeNotification(account);
@@ -191,6 +223,12 @@ export const authController = {
 
   updateMe: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const input = req.body as Record<string, unknown>;
+    let photoUpload: UploadedProfilePhoto | undefined;
+    let photoData: { image: Buffer; contentType: string } | undefined;
+    if (input.avatar !== undefined) {
+      res.status(400).json({ error: 'Upload profile photos using photoBase64 and photoMimeType' });
+      return;
+    }
     const updates: {
       name?: string;
       phone?: string | null;
@@ -201,6 +239,21 @@ export const authController = {
       room?: string | null;
       avatar?: string | null;
     } = {};
+    const hasPhotoData = input.photoBase64 !== undefined || input.photoMimeType !== undefined;
+    if (hasPhotoData) {
+      if (typeof input.photoBase64 !== 'string' || typeof input.photoMimeType !== 'string') {
+        res.status(400).json({ error: 'Both photoBase64 and photoMimeType are required to upload a profile photo' });
+        return;
+      }
+      let image: Buffer;
+      try {
+        image = decodeProfilePhoto(input.photoBase64, input.photoMimeType);
+      } catch (error) {
+        res.status(400).json({ error: error instanceof Error ? error.message : 'Profile photo is invalid' });
+        return;
+      }
+      photoData = { image, contentType: input.photoMimeType };
+    }
     if (input.name !== undefined) {
       if (typeof input.name !== 'string' || input.name.trim().length < 2 || input.name.trim().length > 120) {
         res.status(400).json({ error: 'Name must be between 2 and 120 characters' });
@@ -215,7 +268,7 @@ export const authController = {
       }
       updates.residenceType = input.residenceType as ResidenceType | null;
     }
-    for (const field of ['phone', 'address', 'city', 'building', 'room', 'avatar'] as const) {
+    for (const field of ['phone', 'address', 'city', 'building', 'room'] as const) {
       const value = input[field];
       if (value === undefined) continue;
       if (value !== null && typeof value !== 'string') {
@@ -235,13 +288,28 @@ export const authController = {
       updates.building = null;
       updates.room = null;
     }
-    if (!Object.keys(updates).length) {
+    if (!Object.keys(updates).length && !photoData) {
       res.status(400).json({ error: 'At least one profile field is required' });
       return;
+    }
+    if (photoData) {
+      try {
+        photoUpload = await uploadUserAvatar(
+          req.user!.id,
+          photoData.image.toString('base64'),
+          photoData.contentType,
+        );
+        updates.avatar = photoUpload.downloadUrl;
+      } catch (error) {
+        console.error('Unable to upload the profile photo to Cloudflare R2:', error);
+        res.status(503).json({ error: 'Profile photo storage is unavailable. Please try again later.' });
+        return;
+      }
     }
     try {
       res.json({ user: await db.updateAccountProfile(req.user!.id, updates) });
     } catch (error) {
+      await removeProfilePhoto(photoUpload, 'Unable to remove a profile photo after profile update failed');
       reportDatabaseError(error, res);
     }
   },

@@ -336,7 +336,11 @@ export const mobileApi = {
     return request('/auth/firebase-custom-token', { method: 'POST' }, token);
   },
 
-  updateMe(token: string, fields: Partial<Pick<MobileAccount, 'name' | 'phone' | 'residenceType' | 'address' | 'city' | 'building' | 'room' | 'avatar'>>): Promise<{ user: MobileAccount }> {
+  updateMe(
+    token: string,
+    fields: Partial<Pick<MobileAccount, 'name' | 'phone' | 'residenceType' | 'address' | 'city' | 'building' | 'room'>>
+      & { photoBase64?: string; photoMimeType?: string },
+  ): Promise<{ user: MobileAccount }> {
     return request('/auth/me', { method: 'PATCH', body: JSON.stringify(fields) }, token);
   },
 
@@ -416,7 +420,7 @@ export const mobileApi = {
     }, token);
   },
 
-  getAppConfig(): Promise<{ version: string; university: string; updatedAt?: string }> {
+  getAppConfig(): Promise<{ appName: string; version: string; university: string; updatedAt?: string }> {
     return request('/app/config');
   },
 };
