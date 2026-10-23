@@ -260,7 +260,7 @@ npm install
 npm run dev
 ```
 
-Set `NEXT_PUBLIC_API_URL` in `admin/.env.local` to the reachable API URL, then open `http://localhost:3000` and sign in with an active Super Admin account provisioned in the database.
+Set `API_URL` in `admin/.env.local` to the reachable backend API URL (for example, `http://localhost:5001/api`), then open `http://localhost:3000` and sign in with an active Super Admin account provisioned in the database.
 
 ### 4. Start the mobile application (optional)
 
@@ -288,7 +288,7 @@ Copy the sample environment file for the application you are configuring, then p
 | File | Important configuration |
 | --- | --- |
 | `backend/.env` | Database connection, JWT signing secret, Firebase Admin credentials, and R2 storage configuration |
-| `admin/.env.local` | `NEXT_PUBLIC_API_URL` |
+| `admin/.env.local` | `API_URL` |
 | `Mobile/.env` | `EXPO_PUBLIC_API_URL`, Firebase client settings, Google client IDs, and optional web-push VAPID key |
 
 Backend Firebase Admin values (`FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY`) are server credentials. Never put service-account private keys in mobile or web client configuration. Client-side `EXPO_PUBLIC_*` settings are bundled into the app and must not contain server secrets.
@@ -346,5 +346,5 @@ The complete route definitions and per-route role requirements are in `backend/s
 - In production, apply reviewed migrations with `npm run db:deploy` before starting the new backend version. Do not use `migrate dev` or `migrate reset` against production.
 - For a hosted PostgreSQL service such as Neon, configure `DATABASE_URL` for the runtime and `DIRECT_DATABASE_URL` for direct migration connections.
 - The app name and version are managed through the admin settings and stored in the database; they are not backend environment variables.
-- Build the admin Docker image with `--build-arg NEXT_PUBLIC_API_URL=https://<your-api-host>/api` so the client bundle targets the deployed backend.
+- Set `API_URL=https://<your-api-host>/api` in the admin server's runtime environment. Admin requests are proxied through the server, so the backend URL is not exposed in the browser bundle.
 - Keep database, JWT, Firebase Admin, storage, and signing credentials in private server/build environment configuration—not source code or client bundles.

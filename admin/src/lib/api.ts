@@ -114,11 +114,7 @@ export interface ResolutionTrend {
   avgMins: number;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL?.trim().replace(/\/+$/, '');
-if (!API_BASE) {
-  throw new Error('NEXT_PUBLIC_API_URL must be configured in admin/.env.local.');
-}
-const API_ORIGIN = API_BASE.replace(/\/api\/?$/, '');
+const API_BASE = '/api/proxy';
 const SESSION_TOKEN_KEY = 'fixly.admin.token';
 
 type ApiSession = { token: string; user: UserAccount };
@@ -149,7 +145,7 @@ export class AdminApiClient {
   }
 
   async checkHealth(): Promise<boolean> {
-    const response = await fetch(`${API_ORIGIN}/health`);
+    const response = await fetch(`${API_BASE}/health`);
     return response.ok;
   }
 
