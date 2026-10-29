@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { AppState } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, AppState, Platform } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import SplashScreen from '../screens/shared/SplashScreen';
 import LandingScreen from '../screens/user/LandingScreen';
@@ -17,7 +17,13 @@ import FeedbackScreen from '../screens/user/FeedbackScreen';
 import ForgotPasswordScreen from '../screens/user/ForgotPasswordScreen';
 import { useAuth } from '../context/AuthContext';
 import { RootStackParamList } from '../types';
-import { mobileApi, syncCachedApiData } from '../lib/api';
+import { mobileApi, pingBackend, syncCachedApiData } from '../lib/api';
+import {
+  registerJobNotificationCategory,
+  JOB_ACTION_ACCEPT,
+  JOB_ACTION_IGNORE,
+} from '../lib/push';
+import { isExpoGo } from '../lib/runtime';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -25,6 +31,68 @@ export default function RootNavigator() {
   const { isAuthed, role, isLoading, token } = useAuth();
   const [showSplash, setShowSplash] = useState(true);
   const [isInitialDataLoading, setIsInitialDataLoading] = useState(false);
+  const tokenRef = useRef(token);
+  tokenRef.current = token;
+
+  // ── Register iOS category + Android channel for new-job action buttons ──
+  useEffect(() => {
+    void registerJobNotificationCategory();
+  }, []);
+
+  // ── Auto keep-alive: ping backend on launch and every 5 min to keep Render awake ──
+  useEffect(() => {
+    void pingBackend();
+
+    const KEEP_ALIVE_INTERVAL_MS = 5 * 60 * 1000;
+    const interval = setInterval(() => {
+      if (AppState.currentState === 'active') {
+        void pingBackend();
+      }
+    }, KEEP_ALIVE_INTERVAL_MS);
+
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void pingBackend();
+      }
+    });
+
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
+  }, []);
+
+  // ── Handle Accept / Ignore tapped from notification tray (all app states) ─
+  useEffect(() => {
+    if (isExpoGo || Platform.OS === 'web') return undefined;
+
+    let subscription: { remove: () => void } | null = null;
+
+    void import('expo-notifications').then((Notifications) => {
+      // Handle notifications received while app was in background/killed
+      void Notifications.getLastNotificationResponseAsync().then((response) => {
+        if (!response) return;
+        handleNotificationAction(
+          response.actionIdentifier,
+          response.notification.request.content.data as Record<string, unknown>,
+          tokenRef.current,
+        );
+      });
+
+      // Handle notifications tapped while app is running (foreground/background)
+      subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+        handleNotificationAction(
+          response.actionIdentifier,
+          response.notification.request.content.data as Record<string, unknown>,
+          tokenRef.current,
+        );
+      });
+    });
+
+    return () => {
+      subscription?.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (isLoading) return undefined;
@@ -110,4 +178,42 @@ export default function RootNavigator() {
       )}
     </Stack.Navigator>
   );
+}
+
+// ── Notification action handler (runs outside React tree) ─────────────────
+function handleNotificationAction(
+  actionIdentifier: string,
+  data: Record<string, unknown>,
+  token: string | null,
+): void {
+  const issueId = typeof data?.issueId === 'string' ? data.issueId : null;
+  const ticketId = typeof data?.ticketId === 'string' ? data.ticketId : null;
+  const isNewJob =
+    data?.notificationType === 'assignment' && data?.status === 'queued';
+
+  if (!isNewJob || !issueId) return;
+
+  if (actionIdentifier === JOB_ACTION_ACCEPT) {
+    if (!token) {
+      // Worker is not logged in; nothing we can do silently
+      return;
+    }
+    void mobileApi.acceptIssue(token, issueId)
+      .then(() => {
+        Alert.alert(
+          '✅ Job Accepted',
+          `Ticket #${ticketId ?? issueId} has been assigned to you. Open the app to view the task.`,
+        );
+      })
+      .catch((error: unknown) => {
+        const msg = error instanceof Error ? error.message : 'Please open the app and try again.';
+        Alert.alert('Could not accept job', msg);
+      });
+    return;
+  }
+
+  if (actionIdentifier === JOB_ACTION_IGNORE) {
+    // Worker chose to ignore — no API call needed; notification is dismissed by the OS.
+    return;
+  }
 }

@@ -8,6 +8,20 @@ export interface PushNotificationPayload {
   data?: Record<string, string | undefined>;
 }
 
+/** FCM Android action button for accepting a new job directly from the notification. */
+const ANDROID_ACCEPT_ACTION = {
+  title: '✅ Accept',
+  action: 'JOB_ACTION_ACCEPT',
+  icon: 'ic_notification',
+};
+
+/** FCM Android action button for ignoring a new job notification. */
+const ANDROID_IGNORE_ACTION = {
+  title: '❌ Ignore',
+  action: 'JOB_ACTION_IGNORE',
+  icon: 'ic_notification',
+};
+
 export async function sendFirebasePushNotifications(
   tokens: string[],
   notification: PushNotificationPayload,
@@ -30,6 +44,11 @@ export async function sendFirebasePushNotifications(
     }
   }
 
+  // Determine if this is a "new job available" notification dispatched to workers
+  const isNewJob =
+    notification.type === 'assignment' &&
+    notification.data?.status === 'queued';
+
   for (let offset = 0; offset < tokens.length; offset += 500) {
     const batch = tokens.slice(offset, offset + 500);
     const response = await messaging.sendEachForMulticast({
@@ -38,9 +57,24 @@ export async function sendFirebasePushNotifications(
       data: dataPayload,
       android: {
         priority: 'high',
-        notification: { channelId: 'default', sound: 'default' },
+        notification: {
+          channelId: isNewJob ? 'new_job' : 'default',
+          sound: 'default',
+          // Inline action buttons shown in the notification tray (Android 7+)
+          ...(isNewJob
+            ? { actions: [ANDROID_ACCEPT_ACTION, ANDROID_IGNORE_ACTION] as any }
+            : {}),
+        },
       },
-      apns: { payload: { aps: { sound: 'default' } } },
+      apns: {
+        payload: {
+          aps: {
+            sound: 'default',
+            // iOS notification category triggers the registered Accept / Ignore buttons
+            ...(isNewJob ? { category: 'NEW_JOB' } : {}),
+          },
+        },
+      },
     });
 
     sent += response.successCount;

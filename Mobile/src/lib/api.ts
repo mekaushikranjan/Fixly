@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type MobileRole = 'user' | 'worker' | 'department_supervisor' | 'super_admin';
@@ -92,8 +93,11 @@ interface ErrorPayload {
 }
 
 function getApiBase(): string {
-  const base = process.env.EXPO_PUBLIC_API_URL?.trim().replace(/\/+$/, '');
+  let base = process.env.EXPO_PUBLIC_API_URL?.trim().replace(/\/+$/, '');
   if (!base) throw new Error('Set EXPO_PUBLIC_API_URL to the reachable Fixly API URL.');
+  if (!base.endsWith('/api')) {
+    base = `${base}/api`;
+  }
   return base;
 }
 
@@ -119,7 +123,12 @@ function tokenCacheId(token?: string): string {
 }
 
 function cacheKey(path: string, token?: string): string {
-  const base = process.env.EXPO_PUBLIC_API_URL?.trim().replace(/\/+$/, '') || 'unconfigured';
+  let base: string;
+  try {
+    base = getApiBase();
+  } catch {
+    base = 'unconfigured';
+  }
   return `${API_CACHE_PREFIX}${tokenCacheId(token)}:${encodeURIComponent(base + path)}`;
 }
 
@@ -423,4 +432,35 @@ export const mobileApi = {
   getAppConfig(): Promise<{ appName: string; version: string; university: string; updatedAt?: string }> {
     return request('/app/config');
   },
+
+  ping(): Promise<{ status: string; connected: boolean }> {
+    return pingBackend();
+  },
 };
+
+export async function pingBackend(): Promise<{ status: string; connected: boolean }> {
+  try {
+    const base = getApiBase();
+    const res = await fetch(`${base}/mobile/ping`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        platform: Platform.OS,
+        timestamp: Date.now(),
+      }),
+      signal: AbortSignal.timeout(6000),
+    });
+    if (res.ok) {
+      return { status: 'connected', connected: true };
+    }
+    return { status: 'offline', connected: false };
+  } catch {
+    try {
+      const healthUrl = `${getApiBase().replace(/\/api\/?$/, '')}/health`;
+      const res = await fetch(healthUrl, { signal: AbortSignal.timeout(6000) });
+      return { status: res.ok ? 'connected' : 'offline', connected: res.ok };
+    } catch {
+      return { status: 'disconnected', connected: false };
+    }
+  }
+}

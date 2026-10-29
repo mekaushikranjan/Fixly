@@ -6,6 +6,7 @@ import { analyticsController } from '../controllers/analyticsController';
 import { auditController, shiftsController } from '../controllers/auditController';
 import { notificationsController } from '../controllers/notificationsController';
 import { appConfigController } from '../controllers/appConfigController';
+import { recordMobilePing } from '../services/mobilePingService';
 import { authenticate } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
 
@@ -42,6 +43,19 @@ router.patch(
   requireRole(['super_admin', 'department_supervisor']),
   appConfigController.update
 );
+
+// --- Mobile App Ping / Keep-Alive Heartbeat ---
+router.all('/mobile/ping', (req, res) => {
+  const platform = req.body?.platform || req.query?.platform || 'mobile';
+  const version = req.body?.version || req.query?.version;
+  recordMobilePing(String(platform), typeof version === 'string' ? version : undefined);
+  res.json({
+    status: 'connected',
+    service: 'Fixly Mobile API',
+    platform,
+    timestamp: new Date().toISOString(),
+  });
+});
 
 // --- Issue Routes (Role Scoped) ---
 router.get('/issues', authenticate, issuesController.getIssues);

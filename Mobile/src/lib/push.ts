@@ -2,6 +2,15 @@ import { Platform } from 'react-native';
 import { getFirebaseApp } from './firebase';
 import { isExpoGo } from './runtime';
 
+// ─── Notification action identifiers ────────────────────────────────────────
+/** iOS / Android action id for accepting a new job from the notification. */
+export const JOB_ACTION_ACCEPT = 'JOB_ACTION_ACCEPT';
+/** iOS / Android action id for ignoring / dismissing a new job notification. */
+export const JOB_ACTION_IGNORE = 'JOB_ACTION_IGNORE';
+/** iOS notification category for "new job available" push notifications. */
+export const JOB_CATEGORY_ID = 'NEW_JOB';
+// ────────────────────────────────────────────────────────────────────────────
+
 async function getNotifications() {
   const Notifications = await import('expo-notifications');
   Notifications.setNotificationHandler({
@@ -13,6 +22,42 @@ async function getNotifications() {
     }),
   });
   return Notifications;
+}
+
+/**
+ * Registers the "new_job" notification category on iOS and the
+ * "new_job" notification channel (with inline actions) on Android.
+ * Call this once at app start (before registering for push tokens).
+ */
+export async function registerJobNotificationCategory(): Promise<void> {
+  if (isExpoGo || Platform.OS === 'web') return;
+  const Notifications = await getNotifications();
+
+  if (Platform.OS === 'ios') {
+    await Notifications.setNotificationCategoryAsync(JOB_CATEGORY_ID, [
+      {
+        identifier: JOB_ACTION_ACCEPT,
+        buttonTitle: '✅ Accept',
+        options: { opensAppToForeground: false },
+      },
+      {
+        identifier: JOB_ACTION_IGNORE,
+        buttonTitle: '❌ Ignore',
+        options: { opensAppToForeground: false, isDestructive: true },
+      },
+    ]);
+  }
+
+  if (Platform.OS === 'android') {
+    // Primary "new_job" channel with high importance
+    await Notifications.setNotificationChannelAsync('new_job', {
+      name: 'New Job Alerts',
+      importance: Notifications.AndroidImportance.MAX,
+      sound: 'default',
+      enableVibrate: true,
+      vibrationPattern: [0, 250, 250, 250],
+    });
+  }
 }
 
 export async function registerForPushNotifications(): Promise<string | null> {
@@ -52,6 +97,14 @@ export async function registerForPushNotifications(): Promise<string | null> {
       name: 'Fixly notifications',
       importance: Notifications.AndroidImportance.HIGH,
       sound: 'default',
+    });
+    // Also ensure the new_job channel is created during push registration
+    await Notifications.setNotificationChannelAsync('new_job', {
+      name: 'New Job Alerts',
+      importance: Notifications.AndroidImportance.MAX,
+      sound: 'default',
+      enableVibrate: true,
+      vibrationPattern: [0, 250, 250, 250],
     });
   }
 
@@ -142,15 +195,22 @@ export function subscribeToForegroundMessages(
         const title = message.notification?.title;
         const body = message.notification?.body;
         if (!title && !body) return;
+        const isNewJob = message.data?.notificationType === 'assignment' && message.data?.status === 'queued';
         await Notifications.scheduleNotificationAsync({
           content: {
             title: title || 'Fixly',
             body: body || '',
             data: message.data,
             sound: 'default',
+            ...(isNewJob && Platform.OS === 'ios'
+              ? { categoryIdentifier: JOB_CATEGORY_ID }
+              : {}),
           },
           trigger: null,
-        });
+          ...(isNewJob && Platform.OS === 'android'
+            ? { identifier: `new_job_${String(message.data?.issueId ?? Date.now())}` }
+            : {}),
+        } as Parameters<typeof Notifications.scheduleNotificationAsync>[0]);
       });
     })
     .catch((error: unknown) => {

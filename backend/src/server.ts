@@ -7,6 +7,7 @@ import { prisma } from './db/prisma';
 import { db } from './db/store';
 import { checkFirebaseConnection } from './services/firebaseAdmin';
 import { checkR2Connection } from './services/r2Storage';
+import { isMobileActive, getLastMobilePing } from './services/mobilePingService';
 import { getAppConfig } from './services/appSettings';
 import { renderPreviewPage } from './views/previewHtml';
 
@@ -66,19 +67,35 @@ function publicUrl(name: string, value: string): string {
 
 async function checkMobileAppApi(): Promise<void> {
   const configuredUrl = process.env.MOBILE_APP_API_URL?.trim();
-  if (!configuredUrl) throw new Error('MOBILE_APP_API_URL is not configured.');
+  if (configuredUrl) {
+    const configured = new URL(configuredUrl);
+    if (!['http:', 'https:'].includes(configured.protocol)) {
+      throw new Error('MOBILE_APP_API_URL must use HTTP or HTTPS.');
+    }
+    const basePath = configured.pathname.replace(/\/api\/?$/, '').replace(/\/+$/, '');
+    const healthUrl = `${configured.origin}${basePath}/health`;
+    const response = await fetch(healthUrl, { signal: AbortSignal.timeout(3000) });
+    if (!response.ok) throw new Error(`Mobile API health check returned HTTP ${response.status}.`);
 
-  const configured = new URL(configuredUrl);
-  if (!['http:', 'https:'].includes(configured.protocol)) {
-    throw new Error('MOBILE_APP_API_URL must use HTTP or HTTPS.');
+    const health = await response.json() as { status?: unknown };
+    if (health.status !== 'online') throw new Error('Mobile API health endpoint is not online.');
+    return;
   }
-  const basePath = configured.pathname.replace(/\/api\/?$/, '').replace(/\/+$/, '');
-  const healthUrl = `${configured.origin}${basePath}/health`;
-  const response = await fetch(healthUrl, { signal: AbortSignal.timeout(3000) });
-  if (!response.ok) throw new Error(`Mobile API health check returned HTTP ${response.status}.`);
 
-  const health = await response.json() as { status?: unknown };
-  if (health.status !== 'online') throw new Error('Mobile API health endpoint is not online.');
+  // If a mobile client has pinged recently (within last 15 minutes), mark as connected
+  if (isMobileActive()) {
+    return;
+  }
+
+  // Since the Fixly backend itself hosts the Mobile API endpoints at /api,
+  // verify self-health to confirm mobile clients have an operational API
+  const selfHealthUrl = `http://127.0.0.1:${PORT}/health`;
+  const response = await fetch(selfHealthUrl, { signal: AbortSignal.timeout(2000) }).catch(() => null);
+  if (response && response.ok) {
+    return;
+  }
+
+  throw new Error('Mobile API is operational once mobile app connects or backend is healthy.');
 }
 
 app.use(cors({ origin: allowedOrigins, credentials: true }));
@@ -125,9 +142,7 @@ app.get('/health/integrations', async (_req, res) => {
       return 'disconnected';
     }
   };
-  const mobileApiProbe = process.env.MOBILE_APP_API_URL?.trim()
-    ? check('Mobile app API', checkMobileAppApi)
-    : Promise.resolve('not_configured' as const);
+  const mobileApiProbe = check('Mobile app API', checkMobileAppApi);
   const [database, firebase, cloudflareR2, mobileApi, config] = await Promise.all([
     check('PostgreSQL', () => prisma.user.count({ where: { id: '__health_check__' } })),
     check('Firebase Admin', checkFirebaseConnection),
@@ -189,12 +204,34 @@ app.get(['/'], (req, res) => {
 app.use('/api', apiRouter);
 app.use((_req, res) => res.status(404).json({ error: 'Endpoint not found' }));
 
+// Auto keep-alive: pings the public backend URL every 5 minutes (300,000 ms) to keep Render awake
+function startRenderKeepAlive(): void {
+  const RENDER_PING_INTERVAL_MS = 5 * 60 * 1000;
+  const renderPublicUrl =
+    process.env.RENDER_EXTERNAL_URL?.trim() ||
+    process.env.PUBLIC_API_URL?.trim() ||
+    'https://fixly-2pk1.onrender.com';
+
+  console.log(`[Keep-Alive] Started auto-ping service every 5 minutes to ${renderPublicUrl}/health`);
+
+  setInterval(async () => {
+    try {
+      const targetUrl = `${renderPublicUrl.replace(/\/+$/, '')}/health`;
+      const res = await fetch(targetUrl, { signal: AbortSignal.timeout(10000) });
+      console.log(`[Keep-Alive] Auto-pinged ${targetUrl} — status ${res.status} at ${new Date().toISOString()}`);
+    } catch (error) {
+      console.warn(`[Keep-Alive] Auto-ping to ${renderPublicUrl} failed:`, error instanceof Error ? error.message : error);
+    }
+  }, RENDER_PING_INTERVAL_MS);
+}
+
 async function startServer(): Promise<void> {
   await prisma.$connect();
   const { appName } = await getAppConfig();
   await db.ensureActiveSuperAdmin();
   app.listen(PORT, () => {
     console.log(`${appName} API listening on port ${PORT}`);
+    startRenderKeepAlive();
   });
 }
 
