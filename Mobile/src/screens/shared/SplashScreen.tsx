@@ -11,7 +11,6 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSystemBars } from '../../hooks/useSystemBars';
 import { colors } from '../../theme/colors';
-import { pingBackend } from '../../lib/api';
 
 const { width } = Dimensions.get('window');
 
@@ -31,20 +30,13 @@ export default function SplashScreen({
   const progressAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
-  const [statusText, setStatusText] = useState('Connecting to Fixly...');
-  const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'offline'>('checking');
+  const [statusText, setStatusText] = useState('Loading Fixly...');
   const [isReadyToComplete, setIsReadyToComplete] = useState(false);
   const minTimeElapsed = useRef(false);
   const completionTriggered = useRef(false);
 
   // Entrance animations
   useEffect(() => {
-    void pingBackend().then((res) => {
-      setBackendStatus(res.connected ? 'connected' : 'offline');
-    }).catch(() => {
-      setBackendStatus('offline');
-    });
-
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -184,18 +176,6 @@ export default function SplashScreen({
             <Text style={styles.statusText}>{statusText}</Text>
           </View>
 
-          <View style={styles.connectionBadge}>
-            <View
-              style={[
-                styles.connectionDot,
-                { backgroundColor: backendStatus === 'connected' ? '#34D399' : '#FBBF24' },
-              ]}
-            />
-            <Text style={styles.connectionBadgeText}>
-              {backendStatus === 'connected' ? 'Backend: Connected' : 'Connecting to API...'}
-            </Text>
-          </View>
-
           <Text style={styles.versionText}>Version 1.0.0</Text>
         </View>
       </LinearGradient>
@@ -333,27 +313,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     letterSpacing: 0.2,
-  },
-  connectionBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(0, 0, 0, 0.22)',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 14,
-    marginBottom: 10,
-  },
-  connectionDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-  },
-  connectionBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.4,
   },
   versionText: {
     color: 'rgba(255, 255, 255, 0.65)',

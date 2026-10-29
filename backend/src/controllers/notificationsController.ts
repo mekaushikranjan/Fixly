@@ -67,7 +67,7 @@ export const notificationsController = {
   },
 
   send: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-    const { title, body, audience, type } = req.body as Record<string, unknown>;
+    const { title, body, audience, recipientEmail, type } = req.body as Record<string, unknown>;
     if (typeof title !== 'string' || !title.trim() || title.trim().length > 120) {
       res.status(400).json({ error: 'Title must be between 1 and 120 characters' });
       return;
@@ -76,8 +76,25 @@ export const notificationsController = {
       res.status(400).json({ error: 'Message must be between 1 and 1000 characters' });
       return;
     }
-    if (typeof audience !== 'string' || (audience !== 'all' && !roles.includes(audience as UserRole))) {
+    if (
+      typeof audience !== 'string'
+      || (audience !== 'all' && audience !== 'specific' && !roles.includes(audience as UserRole))
+    ) {
       res.status(400).json({ error: 'A valid notification audience is required' });
+      return;
+    }
+    const normalizedRecipientEmail = typeof recipientEmail === 'string'
+      ? recipientEmail.trim().toLowerCase()
+      : '';
+    if (
+      audience === 'specific'
+      && (
+        typeof recipientEmail !== 'string'
+        || normalizedRecipientEmail.length > 254
+        || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedRecipientEmail)
+      )
+    ) {
+      res.status(400).json({ error: 'A valid account email is required for a specific recipient' });
       return;
     }
     const notificationType = typeof type === 'string' && ['info', 'alert', 'assignment', 'system'].includes(type)
@@ -85,13 +102,26 @@ export const notificationsController = {
       : 'info';
 
     try {
-      const recipients = await prisma.user.findMany({
-        where: {
-          isActive: true,
-          ...(audience !== 'all' && { role: audience as UserRole }),
-        },
-        select: { id: true },
-      });
+      const specificRecipient = audience === 'specific'
+        ? await prisma.user.findFirst({
+            where: { email: normalizedRecipientEmail, isActive: true },
+            select: { id: true },
+          })
+        : null;
+      if (audience === 'specific' && !specificRecipient) {
+        res.status(404).json({ error: 'No active Fixly account was found for that email address' });
+        return;
+      }
+
+      const recipients = specificRecipient
+        ? [specificRecipient]
+        : await prisma.user.findMany({
+            where: {
+              isActive: true,
+              ...(audience !== 'all' && audience !== 'specific' && { role: audience as UserRole }),
+            },
+            select: { id: true },
+          });
       if (!recipients.length) {
         res.status(409).json({ error: 'There are no active accounts in that audience' });
         return;

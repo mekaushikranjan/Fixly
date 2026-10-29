@@ -21,6 +21,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [audience, setAudience] = useState('all');
+  const [recipientEmail, setRecipientEmail] = useState('');
   const [type, setType] = useState('info');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
@@ -33,9 +34,16 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
     setFeedback('');
     setSending(true);
     try {
-      const result = await api.sendNotification({ title: title.trim(), body: body.trim(), audience, type });
+      const result = await api.sendNotification({
+        title: title.trim(),
+        body: body.trim(),
+        audience,
+        ...(audience === 'specific' ? { recipientEmail: recipientEmail.trim() } : {}),
+        type,
+      });
       setTitle('');
       setBody('');
+      setRecipientEmail('');
       const pushSummary = result.push.attempted === 0
         ? 'No mobile devices are registered for push notifications yet.'
         : `Push accepted by Firebase for ${result.push.sent} of ${result.push.attempted} devices; ${result.push.failed} failed.`;
@@ -112,6 +120,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
                 <option value="worker">Workers</option>
                 <option value="department_supervisor">Department supervisors</option>
                 <option value="super_admin">Super Admins</option>
+                <option value="specific">A specific account</option>
               </select>
             </div>
             <div>
@@ -124,6 +133,23 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
               </select>
             </div>
           </div>
+          {audience === 'specific' && (
+            <>
+              <label className="form-label" htmlFor="notification-recipient-email">Account email</label>
+              <input
+                id="notification-recipient-email"
+                className="input"
+                type="email"
+                value={recipientEmail}
+                onChange={(event) => setRecipientEmail(event.target.value)}
+                maxLength={254}
+                placeholder="name@example.com"
+                autoComplete="email"
+                required
+              />
+              <p className="field-hint">Targets an active Fixly account, including workers. It will not send an email.</p>
+            </>
+          )}
           {error && <p className="notification-feedback error" role="alert">{error}</p>}
           {feedback && <p className={`notification-feedback ${feedbackTone}`} role="status">{feedback}</p>}
           <div className="notification-compose-actions">

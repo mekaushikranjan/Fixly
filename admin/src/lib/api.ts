@@ -213,7 +213,13 @@ export class AdminApiClient {
     return this.request('/notifications/read-all', { method: 'PATCH' });
   }
 
-  sendNotification(input: { title: string; body: string; audience: string; type: string }): Promise<{
+  sendNotification(input: {
+    title: string;
+    body: string;
+    audience: string;
+    recipientEmail?: string;
+    type: string;
+  }): Promise<{
     success: boolean;
     recipientCount: number;
     push: { attempted: number; sent: number; failed: number; error?: string };

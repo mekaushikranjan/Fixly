@@ -158,10 +158,6 @@ export default function JobFeedScreen({ navigation }: JobFeedScreenProps) {
               <View style={styles.liveDot} />
               <Text style={styles.campusTagText}>FIXLY POOL</Text>
             </View>
-            <View style={styles.connectedPill}>
-              <View style={styles.connectedDot} />
-              <Text style={styles.connectedPillText}>CONNECTED</Text>
-            </View>
           </View>
 
           <View style={styles.dutyPill}>
@@ -504,27 +500,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
-  },
-  connectedPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#059669',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 5,
-  },
-  connectedDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#34D399',
-  },
-  connectedPillText: {
-    color: '#FFFFFF',
-    fontSize: 9.5,
-    fontWeight: '800',
-    letterSpacing: 0.6,
   },
   liveDot: {
     width: 6,

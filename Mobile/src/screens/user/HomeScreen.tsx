@@ -74,16 +74,12 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           <View style={styles.headerDecoArc2} />
           <View style={styles.headerDecoCircle} />
 
-          {/* Top Bar: Campus Tag, Connection Pill & Notification Bell */}
+          {/* Top Bar: Campus Tag & Notification Bell */}
           <View style={styles.topBar}>
             <View style={styles.campusTagRow}>
               <View style={styles.campusTag}>
                 <View style={styles.campusDot} />
                 <Text style={styles.campusTagText}>LPU CAMPUS</Text>
-              </View>
-              <View style={styles.connectedPill}>
-                <View style={styles.connectedDot} />
-                <Text style={styles.connectedPillText}>CONNECTED</Text>
               </View>
             </View>
 
@@ -313,27 +309,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 14,
-  },
-  connectedPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#10B981',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 5,
-  },
-  connectedDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#FFFFFF',
-  },
-  connectedPillText: {
-    color: '#FFFFFF',
-    fontSize: 9.5,
-    fontWeight: '800',
-    letterSpacing: 0.6,
   },
   campusDot: {
     width: 6,

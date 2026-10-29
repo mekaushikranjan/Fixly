@@ -42,15 +42,11 @@ export default function LandingScreen({ navigation }: LandingScreenProps) {
         <View style={styles.decoCircle2} />
         <View style={styles.decoCircle3} />
 
-        {/* Institutional Campus Pill & Backend Status */}
+        {/* Institutional Campus Pill */}
         <View style={styles.topStatusRow}>
           <View style={styles.campusPill}>
             <View style={styles.campusLiveDot} />
             <Text style={styles.campusPillText}>LPU SMART CAMPUS</Text>
-          </View>
-          <View style={styles.connectedPill}>
-            <View style={styles.connectedDot} />
-            <Text style={styles.connectedPillText}>Connected</Text>
           </View>
         </View>
 
@@ -213,29 +209,6 @@ const styles = StyleSheet.create({
     gap: 6,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  connectedPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#059669',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-    gap: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
-  },
-  connectedDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#34D399',
-  },
-  connectedPillText: {
-    fontSize: 10.5,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
   },
   campusLiveDot: {
     width: 6,

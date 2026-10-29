@@ -1,6 +1,6 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, StyleSheet, Pressable, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, Pressable, useWindowDimensions, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import WorkerJobsStack from './WorkerJobsStack';
 import ActiveTaskScreen from '../screens/worker/ActiveTaskScreen';
@@ -34,14 +34,14 @@ function TabIcon({
   route,
   focused,
   fontSize,
-  paddingH,
+  highlightWidth,
 }: {
   route: string;
   focused: boolean;
   fontSize: number;
-  paddingH: number;
+  highlightWidth: number;
 }) {
-  const iconColor = focused ? ACTIVE : INACTIVE;
+  const iconColor = focused ? '#FFFFFF' : INACTIVE;
   const label = ROUTE_LABELS[route] ?? route;
 
   const renderIcon = () => {
@@ -62,7 +62,7 @@ function TabIcon({
   };
 
   return (
-    <View style={[styles.tabItem, { paddingHorizontal: paddingH }, focused && styles.tabItemActive]}>
+    <View style={[styles.tabItem, { width: highlightWidth }, focused && styles.tabItemActive]}>
       {renderIcon()}
       <Text
         numberOfLines={1}
@@ -85,11 +85,13 @@ export default function WorkerTabs() {
   const isMediumDevice = screenWidth >= 380 && screenWidth < 415;
 
   const tabFontSize = isSmallDevice ? 10 : isMediumDevice ? 10.5 : 11.5;
-  const tabPaddingH = isSmallDevice ? 3 : isMediumDevice ? 5 : 7;
-  const sideMargin = isSmallDevice ? 14 : isMediumDevice ? 18 : 22;
-  const barHeight = isSmallDevice ? 68 : 72;
+  const sideMargin = isSmallDevice ? 10 : isMediumDevice ? 12 : 14;
+  const tabHighlightWidth = Math.max(40, Math.min(64, (screenWidth - sideMargin * 2 - 8) / 5 - 8));
+  const barHeight = isSmallDevice ? 62 : 66;
 
-  const bottomOffset = insets.bottom > 0 ? insets.bottom + 10 : 24;
+  const bottomOffset = Platform.OS === 'ios'
+    ? (insets.bottom > 0 ? Math.max(insets.bottom - 8, 0) : 8)
+    : (insets.bottom > 0 ? insets.bottom + 4 : 8);
 
   return (
     <Tab.Navigator
@@ -112,9 +114,6 @@ export default function WorkerTabs() {
         ],
         tabBarItemStyle: styles.tabBarItem,
         tabBarIconStyle: styles.tabBarIconStyle,
-        tabBarBackground: () => (
-          <View pointerEvents="none" style={styles.outerRing} />
-        ),
         tabBarButton: ({ ref, ...rest }: any) => (
           <Pressable {...rest} android_ripple={null} style={rest.style} />
         ),
@@ -123,7 +122,7 @@ export default function WorkerTabs() {
             route={route.name}
             focused={focused}
             fontSize={tabFontSize}
-            paddingH={tabPaddingH}
+            highlightWidth={tabHighlightWidth}
           />
         ),
       })}
@@ -156,31 +155,20 @@ export default function WorkerTabs() {
 const styles = StyleSheet.create({
   tabBar: {
     position: 'absolute',
-    borderRadius: 22,
+    borderRadius: 999,
     backgroundColor: '#FFFFFF',
-    borderWidth: 0,
-    overflow: 'visible',
+    borderWidth: 1,
+    borderColor: '#F1F2F4',
     paddingBottom: 0,
     paddingTop: 0,
     paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.22,
-    shadowRadius: 14,
-    elevation: 8,
-  },
-  outerRing: {
-    position: 'absolute',
-    top: -6,
-    left: -6,
-    right: -6,
-    bottom: -6,
-    borderRadius: 28,
-    borderWidth: 2,
-    borderColor: 'rgba(0, 0, 0, 0.14)',
-    backgroundColor: 'transparent',
+    shadowColor: '#182230',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 6,
   },
   tabBarItem: {
     height: '100%',
@@ -199,22 +187,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tabItem: {
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
-    borderRadius: 14,
+    paddingHorizontal: 4,
+    borderRadius: 16,
     gap: 3,
   },
   tabItemActive: {
-    backgroundColor: `${colors.primary}15`,
+    backgroundColor: ACTIVE,
   },
   tabLabel: {
+    width: '100%',
     fontWeight: '500',
     color: INACTIVE,
     letterSpacing: 0.1,
+    textAlign: 'center',
   },
   tabLabelActive: {
-    color: ACTIVE,
+    color: '#FFFFFF',
     fontWeight: '600',
   },
 });
