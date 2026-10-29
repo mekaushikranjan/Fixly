@@ -156,7 +156,7 @@ export default function UserTabs() {
 const styles = StyleSheet.create({
   tabBar: {
     position: 'absolute',
-    borderRadius: 999,
+    borderRadius: 18,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#F1F2F4',
